@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pioneer DDJ-FLX2 - MIDI Monitor & App</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            color: #ff3366;
+            text-align: center;
+        }
+        button {
+            background-color: #ff3366;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 15px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #e02e5b;
+        }
+        #status {
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #ffa500;
+        }
+        .log-box {
+            background: #0d0d0d;
+            border: 1px solid #333;
+            border-radius: 6px;
+            height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #1a1a1a;
+            padding-bottom: 3px;
+        }
+        .midi-data {
+            color: #00ffcc;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>DDJ-FLX2 Web Controller</h1>
+    <div id="status">Status: Rozłączony</div>
+    <button id="connectBtn">Połącz z kontrolerem MIDI</button>
+    
+    <h3>Odebrane komunikaty MIDI:</h3>
+    <div class="log-box" id="logBox">
+        <div class="log-entry">Oczekiwanie na połączenie...</div>
+    </div>
+</div>
+
+<script>
+    const connectBtn = document.getElementById('connectBtn');
+    const statusDiv = document.getElementById('status');
+    const logBox = document.getElementById('logBox');
+
+    function logMessage(msg) {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `[${new Date().toLocaleTimeString()}] <span class="midi-data">${msg}</span>`;
+        logBox.prepend(entry);
+    }
+
+    function onMIDISuccess(midiAccess) {
+        statusDiv.textContent = "Status: MIDI dostępne. Szukam urządzeń...";
+        statusDiv.style.color = "#00ffcc";
+
+        let inputs = midiAccess.inputs.values();
+        let connectedDevices = 0;
+
+        for (let input of inputs) {
+            connectedDevices++;
+            statusDiv.textContent = `Połączono z: ${input.name}`;
+            input.onmidimessage = handleMIDIMessage;
+            logMessage(`Znaleziono urządzenie wejściowe: ${input.name}`);
+        }
+
+        if (connectedDevices === 0) {
+            statusDiv.textContent = "Status: Brak wykrytych urządzeń MIDI!";
+            statusDiv.style.color = "#ff4444";
+            logMessage("Nie wykryto żadnego kontrolera podłączonego przez USB/Bluetooth.");
+        }
+
+        // Nasłuchiwanie na wypadek podłączenia/odłączenia w trakcie
+        midiAccess.onstatechange = (e) => {
+            logMessage(`Urządzenie ${e.port.name} (${e.port.type}) zmieniło stan: ${e.port.state}`);
+        };
+    }
+
+    function onMIDIFailure() {
+        statusDiv.textContent = "Status: Błąd dostępu do Web MIDI!";
+        statusDiv.style.color = "#ff4444";
+        logMessage("Przeglądarka zablokowała dostęp do MIDI lub go nie wspiera.");
+    }
+
+    function handleMIDIMessage(event) {
+        let [command, data1, data2] = event.data;
+        // command:typ komunikatu, data1:numer kontrolera/nuty, data2:wartość (np. siła wciśnięcia lub pozycja pokrętła)
+        logMessage(`Komunikat -> Cmd: ${command}, Key/CC: ${data1}, Val: ${data2}`);
+    }
+
+    connectBtn.addEventListener('click', () => {
+        if (navigator.requestMIDIAccess) {
+            navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+        } else {
+            alert("Twoja przeglądarka nie obsługuje Web MIDI API. Użyj Google Chrome lub Microsoft Edge.");
+        }
+    });
+</script>
+
+</body>
+</html>
